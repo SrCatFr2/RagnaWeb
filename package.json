@@ -1,6 +1,7 @@
 {
   "name": "nodejs",
   "version": "1.0.0",
+  "type": "module",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -10,6 +11,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/node": "^22.13.11"
+    "@types/node": "^22.13.11",
+    "@zennolab_com/capmonstercloud-client": "^2.0.0",
+    "axios": "^1.10.0",
+    "cheerio": "^1.1.0",
+    "form-data": "^4.0.3",
+    "node-fetch": "^3.3.2"
   }
 }
