@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Checker - RagnaWeb</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-content">
+            <a href="/dashboard" class="nav-brand">RagnaWeb</a>
+            <div class="nav-links">
+                <a href="/dashboard" class="nav-link">Dashboard</a>
+                <a href="/checker" class="nav-link active">Checker</a>
+                <a href="/credits" class="nav-link">Credits</a>
+                <button onclick="logout()" class="btn btn-ghost">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <h2>CC Checker - Ragnarok</h2>
+            <p>RagnarokChecker - Gateways Massivos & Individuales</p>
+        </div>
+
+        <div class="tabs">
+            <div class="tab-list">
+                <button class="tab-button active" onclick="switchTab('single')">Individual</button>
+                <button class="tab-button" onclick="switchTab('bulk')">Massivo</button>
+                <button class="tab-button" onclick="switchTab('stats')">Stats</button>
+            </div>
+
+            <!-- Single Check Tab -->
+            <div id="single-tab" class="tab-content active">
+                <div class="card">
+                    <h3 class="card-title">Individual</h3>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Card Data (NUMBER|MM|YYYY|CVV)</label>
+                        <input type="text" id="single-card" class="form-input form-input-mono" 
+                               placeholder="4268073003965734|08|2027|817" maxlength="50">
+                    </div>
+                    
+                    <button onclick="checkSingle()" class="btn btn-primary">CHECK CARD</button>
+                    
+                    <div id="single-loading" class="loading">
+                        <div class="spinner"></div>
+                        <p>Checking card...</p>
+                    </div>
+                    
+                    <div id="single-results" class="results hidden"></div>
+                </div>
+            </div>
+
+            <!-- Bulk Check Tab -->
+            <div id="bulk-tab" class="tab-content">
+                <div class="card">
+                    <h3 class="card-title">Massivo (Max 100 cards)</h3>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Card List (One per line)</label>
+                        <textarea id="bulk-cards" class="form-input form-input-mono" rows="8"
+                                  placeholder="4268073003965734|08|2027|817&#10;4111111111111111|12|2025|123"></textarea>
+                    </div>
+                    
+                    <button onclick="checkBulk()" class="btn btn-primary">CHECK LIST</button>
+                    
+                    <div id="bulk-loading" class="loading">
+                        <div class="spinner"></div>
+                        <p>Processing cards...</p>
+                        <div class="progress-bar">
+                            <div id="progress-fill" class="progress-fill"></div>
+                        </div>
+                        <p id="progress-text">0 / 0 processed</p>
+                    </div>
+                    
+                    <div id="bulk-stats" class="stats-grid hidden"></div>
+                    <div id="bulk-results" class="results hidden"></div>
+                </div>
+            </div>
+
+            <!-- Statistics Tab -->
+            <div id="stats-tab" class="tab-content">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="total-checks-stat">-</div>
+                        <div class="stat-label">Total Checks</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="approved-stat">-</div>
+                        <div class="stat-label">Approved</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="declined-stat">-</div>
+                        <div class="stat-label">Declined</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="test-cards-stat">-</div>
+                        <div class="stat-label">Cards</div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <button onclick="loadStats()" class="btn btn-secondary">REFRESH STATS</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function switchTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+        }
+
+        async function checkSingle() {
+            const cardData = document.getElementById('single-card').value.trim();
+            const loadingDiv = document.getElementById('single-loading');
+            const resultsDiv = document.getElementById('single-results');
+            
+            if (!cardData) {
+                alert('Enter card data');
+                return;
+            }
+            
+            loadingDiv.classList.add('show');
+            resultsDiv.classList.add('hidden');
+            
+            try {
+                const response = await fetch('/api/checker/check-single', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cardData })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displaySingleResult(data.result);
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (error) {
+                alert('Connection error: ' + error.message);
+            } finally {
+                loadingDiv.classList.remove('show');
+            }
+        }
+
+        function displaySingleResult(result) {
+            const resultsDiv = document.getElementById('single-results');
+            const statusClass = getStatusClass(result.status);
+            
+            resultsDiv.innerHTML = `
+                <div class="result-item ${statusClass}">
+                    <strong>${result.number}</strong> | ${result.type}<br>
+                    <strong>Status:</strong> ${result.status}<br>
+                    <strong>Message:</strong> ${result.message}<br>
+                    <strong>Details:</strong> BIN: ${result.details.bin} | EXP: ${result.details.exp}
+                </div>
+            `;
+            resultsDiv.classList.remove('hidden');
+        }
+
+        async function checkBulk() {
+            const cardListText = document.getElementById('bulk-cards').value.trim();
+            const loadingDiv = document.getElementById('bulk-loading');
+            const resultsDiv = document.getElementById('bulk-results');
+            const statsDiv = document.getElementById('bulk-stats');
+            
+            if (!cardListText) {
+                alert('Enter card list');
+                return;
+            }
+            
+            const cardList = cardListText.split('\n').filter(line => line.trim());
+            
+            if (cardList.length === 0) {
+                alert('No valid cards found');
+                return;
+            }
+            
+            if (cardList.length > 100) {
+                alert('Maximum 100 cards allowed');
+                return;
+            }
+            
+            loadingDiv.classList.add('show');
+            resultsDiv.classList.add('hidden');
+            statsDiv.classList.add('hidden');
+            
+            try {
+                const response = await fetch('/api/checker/check-bulk', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ cardList })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayBulkResults(data.results, data.stats);
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (error) {
+                alert('Connection error: ' + error.message);
+            } finally {
+                loadingDiv.classList.remove('show');
+            }
+        }
+
+        function displayBulkResults(results, stats) {
+            const resultsDiv = document.getElementById('bulk-results');
+            const statsDiv = document.getElementById('bulk-stats');
+            
+            // Show stats
+            statsDiv.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-number">${stats.total}</div>
+                    <div class="stat-label">Total</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.approved}</div>
+                    <div class="stat-label">Approved</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.declined}</div>
+                    <div class="stat-label">Declined</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.testeo}</div>
+                    <div class="stat-label">Test Cards</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">${stats.errors}</div>
+                    <div class="stat-label">Errors</div>
+                </div>
+            `;
+            
+            // Show results
+            resultsDiv.innerHTML = results.map(result => {
+                const statusClass = getStatusClass(result.status);
+                return `
+                    <div class="result-item ${statusClass}">
+                        <strong>#${result.index}</strong> | 
+                        <strong>${result.number || result.cardData}</strong> | 
+                        ${result.type}<br>
+                        <strong>Status:</strong> ${result.status} | 
+                        <strong>Message:</strong> ${result.message}
+                    </div>
+                `;
+            }).join('');
+            
+            statsDiv.classList.remove('hidden');
+            resultsDiv.classList.remove('hidden');
+        }
+
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/checker/stats');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const stats = data.stats;
+                    const credits = data.credits;
+                    
+                    document.getElementById('total-checks-stat').textContent = stats.totalChecks;
+                    document.getElementById('approved-stat').textContent = stats.approvedCards;
+                    document.getElementById('declined-stat').textContent = stats.declinedCards;
+                    document.getElementById('test-cards-stat').textContent = stats.testCards;
+                }
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+
+        function getStatusClass(status) {
+            switch (status) {
+                case 'APPROVED': return 'result-approved';
+                case 'TESTEO': return 'result-testeo';
+                case 'DECLINED':
+                case 'INSUFFICIENT_FUNDS':
+                case 'EXPIRED':
+                case 'INVALID_CVV':
+                    return 'result-declined';
+                default:
+                    return 'result-error';
+            }
+        }
+
+        async function logout() {
+            try {
+                const response = await fetch('/auth/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('Error logging out:', error);
+            }
+        }
+
+        // Load stats on page load
+        document.addEventListener('DOMContentLoaded', loadStats);
+    </script>
+</body>
+</html>

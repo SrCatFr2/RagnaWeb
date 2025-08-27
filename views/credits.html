@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Credits - RagnaWeb</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-content">
+            <a href="/dashboard" class="nav-brand">RagnaWeb</a>
+            <div class="nav-links">
+                <a href="/dashboard" class="nav-link">Dashboard</a>
+                <a href="/checker" class="nav-link">Checker</a>
+                <a href="/credits" class="nav-link active">Credits</a>
+                <button onclick="logout()" class="btn btn-ghost">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="balance-card">
+            <div class="balance-label">Current Balance</div>
+            <div id="current-balance" class="balance-amount">-</div>
+            <div class="balance-label">Available Credits</div>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="total-earned">-</div>
+                <div class="stat-label">Total Earned</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="total-spent">-</div>
+                <div class="stat-label">Total Spent</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="cards-checked">-</div>
+                <div class="stat-label">Cards Checked</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="success-rate">-</div>
+                <div class="stat-label">Success Rate</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 class="card-title">🔑 Redeem Key</h3>
+            <p>Enter your key code to add credits to your account</p>
+            
+            <div class="form-group">
+                <label class="form-label">Key Code</label>
+                <input type="text" id="key-input" class="form-input form-input-mono" 
+                       placeholder="RGNA-XXXX-XXXX-XXXX" maxlength="19">
+            </div>
+            
+            <button onclick="redeemKey()" class="btn btn-primary">REDEEM KEY</button>
+            
+            <div id="redeem-message"></div>
+        </div>
+
+        <div class="card">
+            <h3 class="card-title">ℹ️ Credit Information</h3>
+            <div class="grid grid-2">
+                <div>
+                    <h4>Usage Rates</h4>
+                    <ul>
+                        <li><strong>5 cards = 1 credit</strong></li>
+                        <li>Single check: 0.2 credits</li>
+                        <li>Bulk check: 1 credit per 5 cards</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4>Key Information</h4>
+                    <ul>
+                        <li>Keys expire after 30 days</li>
+                        <li>Only brunomars can generate keys</li>
+                        <li>Each key can only be used once</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadBalance() {
+            try {
+                const response = await fetch('/api/credits/balance');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const credits = data.credits;
+                    document.getElementById('current-balance').textContent = credits.current;
+                    document.getElementById('total-earned').textContent = credits.totalEarned;
+                    document.getElementById('total-spent').textContent = credits.totalSpent;
+                    document.getElementById('cards-checked').textContent = credits.totalSpent * 5;
+                    
+                    const successRate = credits.totalSpent > 0 ? 
+                        Math.round((credits.totalSpent * 3) / (credits.totalSpent * 5) * 100) : 0;
+                    document.getElementById('success-rate').textContent = successRate + '%';
+                }
+            } catch (error) {
+                console.error('Error loading balance:', error);
+            }
+        }
+
+        async function redeemKey() {
+            const keyCode = document.getElementById('key-input').value.trim();
+            const messageDiv = document.getElementById('redeem-message');
+            
+            if (!keyCode) {
+                messageDiv.innerHTML = '<div class="message message-error">Enter a key code</div>';
+                return;
+            }
+            
+            try {
+                messageDiv.innerHTML = '<div class="message">Processing key...</div>';
+                
+                const response = await fetch('/api/credits/redeem', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keyCode })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    messageDiv.innerHTML = `<div class="message message-success">✓ ${data.message}</div>`;
+                    document.getElementById('key-input').value = '';
+                    
+                    setTimeout(() => {
+                        loadBalance();
+                        messageDiv.innerHTML = '';
+                    }, 3000);
+                } else {
+                    messageDiv.innerHTML = `<div class="message message-error">✗ ${data.message}</div>`;
+                }
+                
+            } catch (error) {
+                messageDiv.innerHTML = '<div class="message message-error">✗ Connection error</div>';
+            }
+        }
+
+        // Format key input
+        document.getElementById('key-input').addEventListener('input', function(e) {
+            let value = e.target.value.replace(/[^A-Z0-9]/g, '');
+            let formatted = '';
+            
+            for (let i = 0; i < value.length && i < 16; i++) {
+                if (i === 4 || i === 8 || i === 12) {
+                    formatted += '-';
+                }
+                formatted += value[i];
+            }
+            
+            if (formatted.length > 4 && !formatted.startsWith('RGNA-')) {
+                formatted = 'RGNA-' + formatted.substring(5);
+            } else if (formatted.length <= 4) {
+                formatted = 'RGNA-' + formatted;
+            }
+            
+            e.target.value = formatted;
+        });
+
+        // Enter to redeem
+        document.getElementById('key-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                redeemKey();
+            }
+        });
+
+        async function logout() {
+            try {
+                const response = await fetch('/auth/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('Error logging out:', error);
+            }
+        }
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', loadBalance);
+    </script>
+</body>
+</html>

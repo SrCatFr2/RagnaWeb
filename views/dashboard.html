@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - RagnaWeb</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-content">
+            <a href="/dashboard" class="nav-brand">RagnaWeb</a>
+            <div class="nav-links">
+                <a href="/dashboard" class="nav-link active">Dashboard</a>
+                <a href="/checker" class="nav-link">Checker</a>
+                <a href="/credits" class="nav-link">Credits</a>
+                <div id="admin-nav" class="hidden">
+                    <a href="/admin" class="nav-link">Admin</a>
+                </div>
+                <button onclick="logout()" class="btn btn-ghost">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <h2>Welcome, <span id="username">-</span></h2>
+            <p>Access your professional card validation tools</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="current-credits">-</div>
+                <div class="stat-label">Available Credits</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="total-checks">-</div>
+                <div class="stat-label">Total Checks</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="login-count">-</div>
+                <div class="stat-label">Login Count</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="success-rate">-</div>
+                <div class="stat-label">Success Rate</div>
+            </div>
+        </div>
+
+        <div class="grid grid-2">
+            <div class="card">
+                <h3 class="card-title">🔍 Card Checker</h3>
+                <p>Validate credit cards with advanced algorithms</p>
+                <a href="/checker" class="btn btn-primary mt-20">OPEN CHECKER</a>
+            </div>
+            
+            <div class="card">
+                <h3 class="card-title">💰 Credit Management</h3>
+                <p>Manage your credits and redeem keys</p>
+                <a href="/credits" class="btn btn-secondary mt-20">MANAGE CREDITS</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 class="card-title">📊 Recent Activity</h3>
+            <div id="recent-activity">
+                <div class="text-center">
+                    <p class="text-muted">Loading activity...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadUserInfo() {
+            try {
+                const response = await fetch('/api/user');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('username').textContent = data.user.username;
+                    document.getElementById('login-count').textContent = data.user.loginCount;
+                    
+                    if (data.user.isAdmin) {
+                        document.getElementById('admin-nav').classList.remove('hidden');
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading user info:', error);
+            }
+        }
+
+        async function loadCredits() {
+            try {
+                const response = await fetch('/api/credits/balance');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('current-credits').textContent = data.credits.current;
+                    document.getElementById('total-checks').textContent = data.credits.totalSpent * 5;
+                    
+                    const successRate = data.credits.totalSpent > 0 ? 
+                        Math.round((data.credits.totalSpent * 3) / (data.credits.totalSpent * 5) * 100) : 0;
+                    document.getElementById('success-rate').textContent = successRate + '%';
+                }
+            } catch (error) {
+                document.getElementById('current-credits').textContent = '0';
+                document.getElementById('total-checks').textContent = '0';
+                document.getElementById('success-rate').textContent = '0%';
+            }
+        }
+
+        async function logout() {
+            try {
+                const response = await fetch('/auth/logout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('Error logging out:', error);
+            }
+        }
+
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUserInfo();
+            loadCredits();
+        });
+    </script>
+</body>
+</html>

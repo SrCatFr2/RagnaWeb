@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - RagnaWeb</title>
+    <link rel="stylesheet" href="/style.css">
+    <style>
+        .admin-container {
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+
+        .admin-header {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 25px;
+            border-radius: 10px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .admin-sections {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .admin-section {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+
+        .key-generator {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .key-generator input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+        }
+
+        .generated-keys {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .key-item {
+            font-family: monospace;
+            padding: 8px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .key-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin: 15px 0;
+        }
+
+        .key-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr;
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            font-size: 14px;
+        }
+
+        .key-row.header {
+            background: #f8f9fa;
+            font-weight: bold;
+        }
+
+        .key-used { color: #27ae60; }
+        .key-unused { color: #e74c3c; }
+        .key-expired { color: #7f8c8d; }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="admin-header">
+            <h1>👑 Panel de Administración</h1>
+            <p>Acceso exclusivo para brunomars</p>
+        </div>
+
+        <div class="nav-buttons" style="margin-bottom: 20px;">
+            <a href="/dashboard" class="btn btn-secondary">← Dashboard</a>
+            <a href="/checker" class="btn btn-primary">🔍 Checker</a>
+            <a href="/credits" class="btn btn-primary">💰 Créditos</a>
+        </div>
+
+        <div class="admin-sections">
+            <!-- Generador de Keys -->
+            <div class="admin-section">
+                <h3>🔑 Generar Keys</h3>
+                <div class="key-generator">
+                    <input type="number" id="key-credits" placeholder="Créditos" min="1" max="1000" value="10">
+                    <input type="number" id="key-quantity" placeholder="Cantidad" min="1" max="50" value="1">
+                    <button onclick="generateKeys()" class="btn btn-primary">Generar</button>
+                </div>
+
+                <div id="generated-keys" class="generated-keys" style="display: none;">
+                    <h4>Keys Generadas:</h4>
+                    <div id="keys-output"></div>
+                </div>
+
+                <div id="generate-message"></div>
+            </div>
+
+            <!-- Estadísticas Generales -->
+            <div class="admin-section">
+                <h3>📊 Estadísticas Generales</h3>
+                <div id="general-stats">
+                    <div class="stats-grid">
+                        <div class="stat-box">
+                            <div id="total-users" class="stat-number">-</div>
+                            <div class="stat-label">Usuarios Totales</div>
+                        </div>
+                        <div class="stat-box">
+                            <div id="total-credits-circulation" class="stat-number">-</div>
+                            <div class="stat-label">Créditos en Circulación</div>
+                        </div>
+                        <div class="stat-box">
+                            <div id="total-credits-earned" class="stat-number">-</div>
+                            <div class="stat-label">Créditos Generados</div>
+                        </div>
+                        <div class="stat-box">
+                            <div id="total-credits-spent" class="stat-number">-</div>
+                            <div class="stat-label">Créditos Gastados</div>
+                        </div>
+                    </div>
+                </div>
+                <button onclick="loadGeneralStats()" class="btn btn-secondary">Actualizar Stats</button>
+            </div>
+        </div>
+
+        <!-- Lista de Keys -->
+        <div class="admin-section">
+            <h3>📋 Gestión de Keys</h3>
+            <div id="key-stats" class="stats-row">
+                <div class="mini-stat">
+                    <div id="total-keys" class="mini-stat-number">-</div>
+                    <div class="mini-stat-label">Total Keys</div>
+                </div>
+                <div class="mini-stat">
+                    <div id="used-keys" class="mini-stat-number">-</div>
+                    <div class="mini-stat-label">Keys Usadas</div>
+                </div>
+                <div class="mini-stat">
+                    <div id="unused-keys" class="mini-stat-number">-</div>
+                    <div class="mini-stat-label">Keys Disponibles</div>
+                </div>
+                <div class="mini-stat">
+                    <div id="credits-distributed" class="mini-stat-number">-</div>
+                    <div class="mini-stat-label">Créditos Distribuidos</div>
+                </div>
+            </div>
+
+            <button onclick="loadKeys()" class="btn btn-primary">Cargar Keys</button>
+
+            <div class="key-list">
+                <div id="keys-table">
+                    <div class="key-row header">
+                        <div>Key Code</div>
+                        <div>Créditos</div>
+                        <div>Estado</div>
+                        <div>Usuario</div>
+                    </div>
+                    <div id="keys-data">
+                        <p style="text-align: center; padding: 20px; color: #666;">
+                            Haz clic en "Cargar Keys" para ver la lista
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Generar keys
+        async function generateKeys() {
+            const credits = parseInt(document.getElementById('key-credits').value);
+            const quantity = parseInt(document.getElementById('key-quantity').value);
+            const messageDiv = document.getElementById('generate-message');
+
+            if (!credits || credits <= 0) {
+                messageDiv.innerHTML = '<div class="error">❌ Cantidad de créditos inválida</div>';
+                return;
+            }
+
+            if (!quantity || quantity <= 0 || quantity > 50) {
+                messageDiv.innerHTML = '<div class="error">❌ Cantidad debe ser entre 1 y 50</div>';
+                return;
+            }
+
+            try {
+                messageDiv.innerHTML = '<div style="color: #667eea;">🔄 Generando keys...</div>';
+
+                const response = await fetch('/api/credits/generate-key', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ credits, quantity })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    messageDiv.innerHTML = `<div class="success">✅ ${data.message}</div>`;
+
+                    // Mostrar keys generadas
+                    const keysOutput = document.getElementById('keys-output');
+                    keysOutput.innerHTML = data.keys.map(key => 
+                        `<div class="key-item">
+                            <span>${key.keyCode}</span>
+                            <span>${key.credits} créditos</span>
+                        </div>`
+                    ).join('');
+
+                    document.getElementById('generated-keys').style.display = 'block';
+
+                    // Limpiar después de 10 segundos
+                    setTimeout(() => {
+                        document.getElementById('generated-keys').style.display = 'none';
+                        messageDiv.innerHTML = '';
+                        loadKeys(); // Recargar lista
+                    }, 10000);
+
+                } else {
+                    messageDiv.innerHTML = `<div class="error">❌ ${data.message}</div>`;
+                }
+
+            } catch (error) {
+                messageDiv.innerHTML = '<div class="error">❌ Error de conexión</div>';
+            }
+        }
+
+        // Cargar lista de keys
+        async function loadKeys() {
+            try {
+                const response = await fetch('/api/credits/keys');
+                const data = await response.json();
+
+                if (data.success) {
+                    const stats = data.stats;
+                    const keys = data.keys;
+
+                    // Actualizar estadísticas
+                    document.getElementById('total-keys').textContent = stats.totalKeys;
+                    document.getElementById('used-keys').textContent = stats.usedKeys;
+                    document.getElementById('unused-keys').textContent = stats.totalKeys - stats.usedKeys;
+                    document.getElementById('credits-distributed').textContent = stats.usedCredits;
+
+                    // Actualizar tabla
+                    const keysData = document.getElementById('keys-data');
+                    if (keys.length === 0) {
+                        keysData.innerHTML = '<p style="text-align: center; padding: 20px; color: #666;">No se encontraron keys</p>';
+                        return;
+                    }
+
+                    keysData.innerHTML = keys.map(key => {
+                        const isExpired = new Date(key.expiresAt) < new Date();
+                        let statusClass = 'key-unused';
+                        let statusText = 'Disponible';
+                        let userText = '-';
+
+                        if (key.isUsed) {
+                            statusClass = 'key-used';
+                            statusText = 'Usada';
+                            userText = key.usedBy.username;
+                        } else if (isExpired) {
+                            statusClass = 'key-expired';
+                            statusText = 'Expirada';
+                        }
+
+                        return `
+                            <div class="key-row">
+                                <div style="font-family: monospace;">${key.keyCode}</div>
+                                <div>${key.credits}</div>
+                                <div class="${statusClass}">${statusText}</div>
+                                <div>${userText}</div>
+                            </div>
+                        `;
+                    }).join('');
+
+                } else {
+                    console.error('Error cargando keys:', data.message);
+                }
+            } catch (error) {
+                console.error('Error de conexión:', error);
+            }
+        }
+
+        // Cargar estadísticas generales
+        async function loadGeneralStats() {
+            try {
+                const response = await fetch('/api/credits/stats');
+                const data = await response.json();
+
+                if (data.success) {
+                    const stats = data.stats;
+
+                    document.getElementById('total-users').textContent = stats.totalUsers;
+                    document.getElementById('total-credits-circulation').textContent = stats.totalCreditsInCirculation;
+                    document.getElementById('total-credits-earned').textContent = stats.totalCreditsEarned;
+                    document.getElementById('total-credits-spent').textContent = stats.totalCreditsSpent;
+                } else {
+                    console.error('Error cargando estadísticas:', data.message);
+                }
+            } catch (error) {
+                console.error('Error de conexión:', error);
+            }
+        }
+
+        // Cargar datos al iniciar
+        window.addEventListener('load', () => {
+            loadGeneralStats();
+            loadKeys();
+        });
+    </script>
+</body>
+</html>

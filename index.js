@@ -1,51 +1,190 @@
-import axios from 'axios';
-import * as cheerio from 'cheerio';
-import fs from 'fs';
+require('dotenv').config();
+const express = require('express');
+const session = require('express-session');
+const MongoStore = require('connect-mongo');
+const path = require('path');
+const connectDB = require('./config/database');
+const authRoutes = require('./routes/auth');
+const checkerRoutes = require('./routes/checker');
+const creditRoutes = require('./routes/credits'); // Nueva línea
 
-const r1 = await axios.get('https://www.hamam.com/en-intl/patara-towel-221-13-xx.html', {
-  headers: {
-    'authority': 'www.hamam.com',
-    'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-    'accept-language': 'es-US,es-419;q=0.9,es;q=0.8',
-    'cache-control': 'max-age=0',
-    'cookie': 'PHPSESSID=kkn5rv7cp8367cr223nfjh4t1a; mage-messages=; user_allowed_save_cookie=%7B%2219%22%3A1%7D; form_key=C8fKKpZOI4cURO2j; _fbp=fb.1.1755802290512.568996765632744765;_gcl_au=1.1.392923881.1755802291; _ga=GA1.1.550158074.1755802292;_clck=bbcdsb%5E2%5Efyn%5E0%5E2059; form_key=C8fKKpZOI4cURO2j; mage-cache-storage={}; mage-cache-storage-section-invalidation={}; mage-cache-sessid=true; recently_viewed_product={}; recently_viewed_product_previous={}; recently_compared_product={}; recently_compared_product_previous={}; product_data_storage={}; _clsk=1ap567d%5E1755802327904%5E4%5E1%5Ej.clarity.ms%2Fcollect;_ga_B7EK45HMNL=GS2.1.s1755802291$o1$g1$t1755802335$j16$l0$h0; private_content_version=26ee70c27c2b147d87cab65f1c9e2375; section_data_ids={%22cart%22:1755802349%2C%22directory-data%22:1755802349%2C%22magepal-gtm-jsdatalayer%22:1755802349%2C%22magepal-eegtm-jsdatalayer%22:1755802349}',
-    'referer': 'https://www.hamam.com/en-intl/bath.html?product_list_order=price&product_list_dir=asc',
-    'sec-ch-ua': '"Chromium";v="139", "Not;A=Brand";v="99"',
-    'sec-ch-ua-mobile': '?0',
-    'sec-ch-ua-platform': '"Linux"',
-    'sec-fetch-dest': 'document',
-    'sec-fetch-mode': 'navigate',
-    'sec-fetch-site': 'same-origin',
-    'sec-fetch-user': '?1',
-    'upgrade-insecure-requests': '1',
-    'user-agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
-  }
-});
+const app = express();
+const PORT = process.env.PORT || 3000;
 
-const html = r1.data;
+// Conectar a MongoDB
+if (process.env.MONGODB_URI) {
+    connectDB();
+} else {
+    console.log('⚠️  MONGODB_URI no definida, usando memoria temporal');
+}
 
-// Buscar CUALQUIER mención de uenc en todo el HTML
-const uencMatches = html.match(/uenc['":\s]*([a-zA-Z0-9+\/=]{20,})/g);
-const checkoutMatches = html.match(/checkout\/cart\/add[^"'\s]*/g);
+// Middleware básico
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.static(path.join(__dirname, 'public')));
 
-console.log('uenc matches:', uencMatches);
-console.log('checkout matches:', checkoutMatches);
+// Configuración de sesiones
+const sessionConfig = {
+    secret: process.env.SESSION_SECRET || 'ragnaweb-fallback-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { 
+        secure: false,
+        maxAge: 24 * 60 * 60 * 1000,
+        httpOnly: true
+    }
+};
 
-// Buscar en scripts también
-const scriptMatches = html.match(/<script[^>]*>([\s\S]*?)<\/script>/gi);
-if (scriptMatches) {
-    scriptMatches.forEach((script, i) => {
-        if (script.includes('uenc') || script.includes('checkout/cart/add')) {
-            console.log(`Script ${i} con uenc/checkout:`, script.substring(0, 200) + '...');
-        }
+if (process.env.MONGODB_URI) {
+    sessionConfig.store = MongoStore.create({
+        mongoUrl: process.env.MONGODB_URI,
+        collectionName: 'sessions',
+        ttl: 24 * 60 * 60
     });
 }
 
-// form_key
-const $ = cheerio.load(html);
-const formKey = $('input[name="form_key"]').val();
-console.log('form_key:', formKey);
+app.use(session(sessionConfig));
 
+// Middleware de logging
+app.use((req, res, next) => {
+    const timestamp = new Date().toISOString();
+    console.log(`${timestamp} - ${req.method} ${req.path} - ${req.session?.user?.username || 'Guest'}`);
+    next();
+});
 
+// Rutas
+app.use('/auth', authRoutes);
+app.use('/api/checker', checkerRoutes);
+app.use('/api/credits', creditRoutes); // Nueva línea
 
-fs.write('output.html', html)
+// Ruta raíz
+app.get('/', (req, res) => {
+    try {
+        if (req.session && req.session.user) {
+            res.sendFile(path.join(__dirname, 'views', 'dashboard.html'));
+        } else {
+            res.sendFile(path.join(__dirname, 'public', 'index.html'));
+        }
+    } catch (error) {
+        console.error('Error en ruta raíz:', error);
+        res.status(500).send('Error interno del servidor');
+    }
+});
+
+// Dashboard
+app.get('/dashboard', (req, res) => {
+    try {
+        if (!req.session || !req.session.user) {
+            return res.redirect('/');
+        }
+        res.sendFile(path.join(__dirname, 'views', 'dashboard.html'));
+    } catch (error) {
+        console.error('Error en dashboard:', error);
+        res.status(500).send('Error interno del servidor');
+    }
+});
+
+// Página del checker
+app.get('/checker', (req, res) => {
+    try {
+        if (!req.session || !req.session.user) {
+            return res.redirect('/');
+        }
+        res.sendFile(path.join(__dirname, 'views', 'checker.html'));
+    } catch (error) {
+        console.error('Error en checker:', error);
+        res.status(500).send('Error interno del servidor');
+    }
+});
+
+// Página de créditos
+app.get('/credits', (req, res) => {
+    try {
+        if (!req.session || !req.session.user) {
+            return res.redirect('/');
+        }
+        res.sendFile(path.join(__dirname, 'views', 'credits.html'));
+    } catch (error) {
+        console.error('Error en credits:', error);
+        res.status(500).send('Error interno del servidor');
+    }
+});
+
+// Panel de admin (solo brunomars)
+app.get('/admin', (req, res) => {
+    try {
+        if (!req.session || !req.session.user || req.session.user.username !== 'brunomars') {
+            return res.redirect('/');
+        }
+        res.sendFile(path.join(__dirname, 'views', 'admin.html'));
+    } catch (error) {
+        console.error('Error en admin:', error);
+        res.status(500).send('Error interno del servidor');
+    }
+});
+
+// API de usuario
+app.get('/api/user', (req, res) => {
+    try {
+        if (!req.session || !req.session.user) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'No autenticado' 
+            });
+        }
+
+        res.json({ 
+            success: true, 
+            user: {
+                username: req.session.user.username,
+                loginCount: req.session.user.loginCount || 0,
+                lastLogin: req.session.user.lastLogin || new Date(),
+                isAdmin: req.session.user.username === 'brunomars'
+            }
+        });
+    } catch (error) {
+        console.error('Error en API user:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Error interno del servidor' 
+        });
+    }
+});
+
+// Manejo de errores global
+app.use((error, req, res, next) => {
+    console.error('❌ Error global:', error);
+    res.status(500).json({ 
+        success: false, 
+        message: 'Error interno del servidor' 
+    });
+});
+
+// 404
+app.use('*', (req, res) => {
+    res.status(404).json({ 
+        success: false, 
+        message: `Ruta no encontrada: ${req.originalUrl}` 
+    });
+});
+
+// Iniciar servidor
+app.listen(PORT, () => {
+    console.log(`🚀 RagnaWeb corriendo en http://localhost:${PORT}`);
+    console.log(`📱 Entorno: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🍃 MongoDB: ${process.env.MONGODB_URI ? 'Conectado' : 'No configurado'}`);
+    console.log(`💳 Checker API disponible en /api/checker`);
+    console.log(`💰 Credits API disponible en /api/credits`);
+    console.log(`👑 Admin panel: /admin (solo brunomars)`);
+});
+
+// Manejo graceful de cierre
+process.on('SIGTERM', () => {
+    console.log('🔒 Cerrando servidor...');
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    console.log('🔒 Cerrando servidor...');
+    process.exit(0);
+});
