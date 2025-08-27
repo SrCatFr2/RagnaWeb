@@ -4,7 +4,7 @@ const fs = require('fs').promises;
 const path = require('path');
 
 // Configuración del proxy
-const USE_PROXY = false; // true/false para activar/desactivar proxy
+const USE_PROXY = true; // true/false para activar/desactivar proxy
 const PROXY_CONFIG = "geo.spyderproxy.com:32325:cBYTJIAcgE:yhajRdMWUg_country-us";
 const SESSION_CACHE_FILE = "session_cache.json";
 
